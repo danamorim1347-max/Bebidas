@@ -161,6 +161,26 @@
         /* Ajustar botões */
         button i.fas { font-size: 12px !important; }
         
+        /* Container para imagens de produtos */
+        .product-image-container {
+            width: 100%;
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: 12px 12px 0 0;
+            overflow: hidden;
+        }
+        
+        /* Estilo para imagens de produtos */
+        .product-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 10px;
+        }
+        
         /* Layout otimizado para mobile */
         @media (max-width: 640px) {
             .header-banner { height: 180px !important; }
@@ -183,6 +203,15 @@
             #cart-fixed button { padding: 10px 14px !important; font-size: 9px !important; border-radius: 20px !important; }
             #modal-checkout .max-h-\[94vh\] { max-height: 85vh !important; }
             #carrinho-itens-list > div { padding: 10px !important; margin-bottom: 6px !important; }
+            
+            /* Ajustes para promoção em mobile */
+            #promocao-container .h-48 {
+                height: 180px !important;
+            }
+            
+            #promocao-container .font-bebas.text-2xl {
+                font-size: 1.5rem !important;
+            }
         }
         
         @media (max-width: 360px) {
@@ -209,12 +238,6 @@
         .product-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 20px rgba(14, 165, 233, 0.15);
-        }
-        
-        .product-image {
-            width: 100%;
-            height: 140px;
-            object-fit: cover;
         }
         
         .product-badge {
@@ -613,17 +636,51 @@
             if (!container) return;
             
             if (PROMOCAO.ativa !== false) {
+                const desconto = PROMOCAO.preco_original ? 
+                    Math.round((1 - (PROMOCAO.preco / PROMOCAO.preco_original)) * 100) : 0;
+                
                 container.innerHTML = `
-                    <div onclick="addPromocao()" class="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-4 rounded-2xl shadow-lg clickable active:scale-95 transition">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <div class="text-[10px] font-black uppercase tracking-widest">🔥 PROMOÇÃO DO DIA</div>
-                                <div class="font-bebas text-lg">${PROMOCAO.titulo || "COMBO FAMÍLIA"}</div>
-                                <div class="text-xs opacity-90">${PROMOCAO.descricao || "3 Refris 2L + Amendoim"}</div>
+                    <div onclick="addPromocao()" class="clickable active:scale-95 transition">
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-2xl shadow-lg overflow-hidden">
+                            <!-- Imagem em destaque -->
+                            <div class="relative h-48 overflow-hidden">
+                                <img src="${PROMOCAO.imagem_url || 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800&auto=format&fit=crop&q=80'}" 
+                                     class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                                     onerror="this.src='https://cdn-icons-png.flaticon.com/512/3075/3075977.png'">
+                                
+                                <!-- Badge de desconto -->
+                                ${desconto > 0 ? `
+                                    <div class="absolute top-4 right-4 bg-red-600 text-white text-sm font-black px-3 py-1 rounded-full shadow-lg">
+                                        ${desconto}% OFF
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Overlay escuro para melhor legibilidade -->
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                                
+                                <!-- Texto sobre a imagem -->
+                                <div class="absolute bottom-0 left-0 right-0 p-4">
+                                    <div class="text-[10px] font-black uppercase tracking-widest text-blue-200">🔥 PROMOÇÃO DO DIA</div>
+                                    <div class="font-bebas text-2xl text-white">${PROMOCAO.titulo || "COMBO FAMÍLIA"}</div>
+                                </div>
                             </div>
-                            <div class="text-right">
-                                <div class="text-2xl font-black">R$ ${Number(PROMOCAO.preco || 39.90).toFixed(2).replace('.',',')}</div>
-                                <div class="text-[10px] line-through opacity-70">R$ ${Number(PROMOCAO.preco_original || 49.90).toFixed(2).replace('.',',')}</div>
+                            
+                            <!-- Informações da promoção -->
+                            <div class="p-4">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <div class="text-xs opacity-90 text-blue-100">${PROMOCAO.descricao || "3 Refris 2L + Amendoim"}</div>
+                                        <div class="text-[10px] text-blue-300 mt-1">Clique para adicionar ao carrinho</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-2xl font-black text-white">R$ ${Number(PROMOCAO.preco || 39.90).toFixed(2).replace('.',',')}</div>
+                                        ${PROMOCAO.preco_original ? `
+                                            <div class="text-[10px] line-through opacity-70 text-blue-200">
+                                                De R$ ${Number(PROMOCAO.preco_original || 49.90).toFixed(2).replace('.',',')}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>`;
@@ -658,12 +715,12 @@
             // Feedback visual
             const promocaoDiv = document.querySelector('#promocao-container div');
             if (promocaoDiv) {
-                promocaoDiv.classList.remove('from-blue-500', 'to-blue-700');
-                promocaoDiv.classList.add('from-green-500', 'to-green-700');
+                promocaoDiv.classList.remove('from-blue-600', 'to-blue-800');
+                promocaoDiv.classList.add('from-green-600', 'to-green-800');
                 
                 setTimeout(() => {
-                    promocaoDiv.classList.remove('from-green-500', 'to-green-700');
-                    promocaoDiv.classList.add('from-blue-500', 'to-blue-700');
+                    promocaoDiv.classList.remove('from-green-600', 'to-green-800');
+                    promocaoDiv.classList.add('from-blue-600', 'to-blue-800');
                 }, 1000);
             }
             
@@ -989,7 +1046,7 @@
                 
                 html += `
                 <div class="product-card clickable" onclick="abrirDetalhesProduto('${p.id}')">
-                    <div class="relative">
+                    <div class="product-image-container">
                         <img src="${p.imagem_url || 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&auto=format&fit=crop'}" 
                              class="product-image"
                              onerror="this.src='https://cdn-icons-png.flaticon.com/512/3075/3075977.png'">
@@ -1021,9 +1078,11 @@
                 <div class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
                     <div class="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden">
                         <div class="relative">
-                            <img src="${produto.imagem_url || 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800&auto=format&fit=crop&q=80'}" 
-                                 class="w-full h-48 object-cover"
-                                 onerror="this.src='https://cdn-icons-png.flaticon.com/512/3075/3075977.png'">
+                            <div class="product-image-container">
+                                <img src="${produto.imagem_url || 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800&auto=format&fit=crop&q=80'}" 
+                                     class="product-image"
+                                     onerror="this.src='https://cdn-icons-png.flaticon.com/512/3075/3075977.png'">
+                            </div>
                             <button onclick="fecharDetalhesProduto()" class="absolute top-4 right-4 bg-white/80 w-10 h-10 rounded-full flex items-center justify-center text-xl">✕</button>
                         </div>
                         <div class="p-6">
