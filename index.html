@@ -701,30 +701,40 @@
                 return;
             }
             
-            CARRINHO.push({
-                id: `promocao-dia-${Date.now()}`,
-                nome: `🔥 ${PROMOCAO.titulo || "PROMOÇÃO DO DIA"}`,
-                descricao: PROMOCAO.descricao || "",
-                preco: PROMOCAO.preco || 39.90,
-                tipo: 'promocao',
-                imagem_url: PROMOCAO.imagem_url || ""
-            });
+            // Verificar se já existe no carrinho
+            const promoExistente = CARRINHO.find(item => 
+                item.tipo === 'promocao' && 
+                item.nome.includes(PROMOCAO.titulo)
+            );
             
-            updateCartFooter();
-            
-            // Feedback visual
-            const promocaoDiv = document.querySelector('#promocao-container div');
-            if (promocaoDiv) {
-                promocaoDiv.classList.remove('from-blue-600', 'to-blue-800');
-                promocaoDiv.classList.add('from-green-600', 'to-green-800');
+            if (!promoExistente) {
+                CARRINHO.push({
+                    id: `promocao-dia-${Date.now()}`,
+                    nome: `🔥 ${PROMOCAO.titulo || "PROMOÇÃO DO DIA"}`,
+                    descricao: PROMOCAO.descricao || "",
+                    preco: PROMOCAO.preco || 39.90,
+                    tipo: 'promocao',
+                    imagem_url: PROMOCAO.imagem_url || ""
+                });
                 
-                setTimeout(() => {
-                    promocaoDiv.classList.remove('from-green-600', 'to-green-800');
-                    promocaoDiv.classList.add('from-blue-600', 'to-blue-800');
-                }, 1000);
+                updateCartFooter();
+                
+                // Feedback visual
+                const promocaoDiv = document.querySelector('#promocao-container div');
+                if (promocaoDiv) {
+                    promocaoDiv.classList.remove('from-blue-600', 'to-blue-800');
+                    promocaoDiv.classList.add('from-green-600', 'to-green-800');
+                    
+                    setTimeout(() => {
+                        promocaoDiv.classList.remove('from-green-600', 'to-green-800');
+                        promocaoDiv.classList.add('from-blue-600', 'to-blue-800');
+                    }, 1000);
+                }
+                
+                alert(`Promoção adicionada ao carrinho! R$ ${Number(PROMOCAO.preco || 39.90).toFixed(2).replace('.',',')}`);
+            } else {
+                alert("Esta promoção já está no carrinho!");
             }
-            
-            alert(`Promoção adicionada ao carrinho! R$ ${Number(PROMOCAO.preco || 39.90).toFixed(2).replace('.',',')}`);
         }
 
         async function loadData() {
@@ -1135,16 +1145,32 @@
                 return;
             }
             
-            // Adicionar produto ao carrinho
-            const produtoCarrinho = {
-                id: produto.id,
-                nome: produto.nome,
-                descricao: produto.descricao || '',
-                preco: produto.preco,
-                tipo: 'produto'
-            };
+            // Verificar se o produto já existe no carrinho
+            const itemExistente = CARRINHO.find(item => 
+                item.id === produto.id && 
+                item.tipo === 'produto'
+            );
             
-            CARRINHO.push(produtoCarrinho);
+            if (itemExistente) {
+                // Incrementar quantidade se já existe
+                itemExistente.quantidade = (itemExistente.quantidade || 1) + 1;
+                itemExistente.precoTotal = (itemExistente.preco || 0) * itemExistente.quantidade;
+            } else {
+                // Adicionar novo item com quantidade
+                const produtoCarrinho = {
+                    id: produto.id,
+                    nome: produto.nome,
+                    descricao: produto.descricao || '',
+                    preco: produto.preco,
+                    precoTotal: produto.preco, // Preço total inicial (1 unidade)
+                    quantidade: 1,
+                    tipo: 'produto',
+                    imagem_url: produto.imagem_url
+                };
+                
+                CARRINHO.push(produtoCarrinho);
+            }
+            
             updateCartFooter();
             
             // Feedback visual
@@ -1164,12 +1190,25 @@
 
         function removeCart(index) {
             if (index >= 0 && index < CARRINHO.length) {
-                CARRINHO.splice(index, 1);
+                const item = CARRINHO[index];
+                
+                if (item.quantidade > 1) {
+                    // Se tiver mais de 1, apenas decrementar a quantidade
+                    item.quantidade--;
+                    item.precoTotal = item.preco * item.quantidade;
+                    
+                    // Atualizar exibição do carrinho
+                    renderCarrinhoModal();
+                } else {
+                    // Se tiver apenas 1, remover o item completamente
+                    CARRINHO.splice(index, 1);
+                }
+                
                 updateCartFooter();
+                
                 if (CARRINHO.length === 0) {
                     document.getElementById('cart-fixed').classList.add('hidden');
                 }
-                renderCarrinhoModal();
             }
         }
 
@@ -1200,29 +1239,95 @@
             let total = 0;
             
             CARRINHO.forEach((item, index) => {
-                total += Number(item.preco || 0);
+                total += Number(item.precoTotal || item.preco || 0);
                 
-                html += `
-                <div class="bg-white p-4 rounded-[20px] border border-blue-100 flex justify-between items-center">
-                    <div class="flex-1">
-                        <div class="font-black text-[11px] uppercase text-gray-800">${item.nome}</div>
-                        <div class="text-[9px] text-gray-400">${item.descricao || ''}</div>
-                        <div class="text-blue-600 font-black text-sm mt-1">R$ ${Number(item.preco || 0).toFixed(2).replace('.',',')}</div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="removeCart(${index})" class="bg-blue-100 text-blue-600 w-8 h-8 rounded-xl font-black text-lg shadow hover:bg-blue-200 transition">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </div>`;
+                // Verificar se é uma promoção ou produto normal
+                if (item.tipo === 'promocao') {
+                    // Promoções não têm quantidade
+                    html += `
+                    <div class="bg-white p-4 rounded-[20px] border border-blue-100 flex justify-between items-center">
+                        <div class="flex-1">
+                            <div class="font-black text-[11px] uppercase text-gray-800">${item.nome}</div>
+                            <div class="text-[9px] text-gray-400">${item.descricao || ''}</div>
+                            <div class="text-blue-600 font-black text-sm mt-1">R$ ${Number(item.preco || 0).toFixed(2).replace('.',',')}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="removeCart(${index})" class="bg-blue-100 text-blue-600 w-8 h-8 rounded-xl font-black text-lg shadow hover:bg-blue-200 transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                } else {
+                    // Produtos normais com quantidade
+                    html += `
+                    <div class="bg-white p-4 rounded-[20px] border border-blue-100 flex justify-between items-center">
+                        <div class="flex-1">
+                            <div class="font-black text-[11px] uppercase text-gray-800">${item.nome}</div>
+                            <div class="text-[9px] text-gray-400">${item.descricao || ''}</div>
+                            <div class="flex items-center gap-3 mt-2">
+                                <div class="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-1">
+                                    <button onclick="diminuirQuantidade(${index})" class="text-blue-600 font-bold text-sm w-6 h-6 flex items-center justify-center hover:bg-blue-100 rounded">-</button>
+                                    <span class="font-black text-blue-800 min-w-[20px] text-center">${item.quantidade || 1}</span>
+                                    <button onclick="aumentarQuantidade(${index})" class="text-blue-600 font-bold text-sm w-6 h-6 flex items-center justify-center hover:bg-blue-100 rounded">+</button>
+                                </div>
+                                <div class="text-blue-600 font-black text-sm">R$ ${Number(item.precoTotal || item.preco || 0).toFixed(2).replace('.',',')}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="removeCart(${index})" class="bg-blue-100 text-blue-600 w-8 h-8 rounded-xl font-black text-lg shadow hover:bg-blue-200 transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                }
             });
             
             container.innerHTML = html;
             totalDisplay.innerText = `R$ ${total.toFixed(2).replace('.',',')}`;
         }
 
+        function aumentarQuantidade(index) {
+            if (index >= 0 && index < CARRINHO.length) {
+                const item = CARRINHO[index];
+                item.quantidade = (item.quantidade || 1) + 1;
+                item.precoTotal = item.preco * item.quantidade;
+                
+                updateCartFooter();
+                renderCarrinhoModal();
+                
+                // Se estiver no checkout, atualizar também
+                if (!document.getElementById('modal-checkout').classList.contains('hidden')) {
+                    renderCheckoutItens();
+                    renderCheckoutTotal();
+                }
+            }
+        }
+
+        function diminuirQuantidade(index) {
+            if (index >= 0 && index < CARRINHO.length) {
+                const item = CARRINHO[index];
+                
+                if (item.quantidade > 1) {
+                    item.quantidade--;
+                    item.precoTotal = item.preco * item.quantidade;
+                    
+                    updateCartFooter();
+                    renderCarrinhoModal();
+                    
+                    // Se estiver no checkout, atualizar também
+                    if (!document.getElementById('modal-checkout').classList.contains('hidden')) {
+                        renderCheckoutItens();
+                        renderCheckoutTotal();
+                    }
+                } else {
+                    // Se for 1, remover completamente
+                    removeCart(index);
+                }
+            }
+        }
+
         function updateCartFooter() {
-            const total = CARRINHO.reduce((a, b) => a + Number(b.preco || 0), 0);
+            const total = CARRINHO.reduce((a, b) => a + Number(b.precoTotal || b.preco || 0), 0);
             document.getElementById('cart-total-display').innerText = `R$ ${total.toFixed(2).replace('.',',')}`;
             
             if (CARRINHO.length > 0) {
@@ -1241,7 +1346,13 @@
         function salvarCarrinhoLocal() {
             try {
                 const carrinhoData = {
-                    itens: CARRINHO.map(item => ({id: item.id, nome: item.nome, preco: item.preco})),
+                    itens: CARRINHO.map(item => ({
+                        id: item.id,
+                        nome: item.nome,
+                        preco: item.preco,
+                        quantidade: item.quantidade || 1,
+                        tipo: item.tipo
+                    })),
                     timestamp: new Date().getTime()
                 };
                 localStorage.setItem('bebidas_carrinho', JSON.stringify(carrinhoData));
@@ -1259,18 +1370,47 @@
                     const umaHoraAtras = new Date().getTime() - (60 * 60 * 1000);
                     
                     if (data.timestamp > umaHoraAtras) {
-                        data.itens.forEach(item => {
-                            const produto = PRODS.find(p => p.id === item.id);
-                            if (produto && produto.disponivel !== false) {
+                        data.itens.forEach(itemSalvo => {
+                            // Para produtos
+                            if (itemSalvo.tipo === 'produto') {
+                                const produto = PRODS.find(p => p.id === itemSalvo.id);
+                                if (produto && produto.disponivel !== false) {
+                                    // Verificar se já existe no carrinho
+                                    const itemExistente = CARRINHO.find(item => 
+                                        item.id === produto.id && 
+                                        item.tipo === 'produto'
+                                    );
+                                    
+                                    if (itemExistente) {
+                                        // Somar quantidades
+                                        itemExistente.quantidade = (itemExistente.quantidade || 1) + (itemSalvo.quantidade || 1);
+                                        itemExistente.precoTotal = itemExistente.preco * itemExistente.quantidade;
+                                    } else {
+                                        // Adicionar novo
+                                        CARRINHO.push({
+                                            id: produto.id,
+                                            nome: produto.nome,
+                                            descricao: produto.descricao || '',
+                                            preco: produto.preco,
+                                            precoTotal: produto.preco * (itemSalvo.quantidade || 1),
+                                            quantidade: itemSalvo.quantidade || 1,
+                                            tipo: 'produto',
+                                            imagem_url: produto.imagem_url
+                                        });
+                                    }
+                                }
+                            } else if (itemSalvo.tipo === 'promocao') {
+                                // Para promoções
                                 CARRINHO.push({
-                                    id: produto.id,
-                                    nome: produto.nome,
-                                    descricao: produto.descricao || '',
-                                    preco: produto.preco,
-                                    tipo: 'produto'
+                                    id: itemSalvo.id,
+                                    nome: itemSalvo.nome,
+                                    descricao: itemSalvo.descricao || '',
+                                    preco: itemSalvo.preco,
+                                    tipo: 'promocao'
                                 });
                             }
                         });
+                        
                         if (CARRINHO.length > 0) {
                             updateCartFooter();
                         }
@@ -1301,8 +1441,8 @@
                 return;
             }
             
-            // Verificar pedido mínimo
-            const total = CARRINHO.reduce((a, b) => a + Number(b.preco || 0), 0);
+            // Calcular total considerando quantidade
+            const total = CARRINHO.reduce((a, b) => a + Number(b.precoTotal || b.preco || 0), 0);
             const pedidoMinimo = CONFIG.pedido_minimo || 25;
             
             if (total < pedidoMinimo) {
@@ -1340,19 +1480,42 @@
             let html = '';
             
             CARRINHO.forEach((item, index) => {
-                html += `
-                <div class="flex justify-between border-b border-blue-100 pb-2 items-center">
-                    <div>
-                        <span class="font-black">${item.nome}</span>
-                        ${item.descricao ? `<div class="text-[9px] text-gray-500">${item.descricao}</div>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-blue-600 font-black">R$ ${Number(item.preco || 0).toFixed(2).replace('.',',')}</span>
-                        <button onclick="removeCartCheckout(${index})" class="text-blue-500 text-xs hover:text-blue-700">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>`;
+                if (item.tipo === 'promocao') {
+                    // Promoção sem quantidade
+                    html += `
+                    <div class="flex justify-between border-b border-blue-100 pb-2 items-center">
+                        <div>
+                            <span class="font-black">${item.nome}</span>
+                            ${item.descricao ? `<div class="text-[9px] text-gray-500">${item.descricao}</div>` : ''}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-blue-600 font-black">R$ ${Number(item.preco || 0).toFixed(2).replace('.',',')}</span>
+                            <button onclick="removeCartCheckout(${index})" class="text-blue-500 text-xs hover:text-blue-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                } else {
+                    // Produto com quantidade
+                    const quantidade = item.quantidade || 1;
+                    const precoUnitario = item.preco || 0;
+                    const precoTotal = item.precoTotal || precoUnitario;
+                    
+                    html += `
+                    <div class="flex justify-between border-b border-blue-100 pb-2 items-center">
+                        <div>
+                            <span class="font-black">${item.nome}</span>
+                            ${item.descricao ? `<div class="text-[9px] text-gray-500">${item.descricao}</div>` : ''}
+                            <div class="text-[9px] text-blue-600 mt-1">${quantidade} unidade${quantidade > 1 ? 's' : ''} x R$ ${precoUnitario.toFixed(2).replace('.',',')}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-blue-600 font-black">R$ ${precoTotal.toFixed(2).replace('.',',')}</span>
+                            <button onclick="removeCartCheckout(${index})" class="text-blue-500 text-xs hover:text-blue-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>`;
+                }
             });
             
             container.innerHTML = html;
@@ -1404,7 +1567,7 @@
         }
 
         function renderCheckoutTotal() {
-            const sub = CARRINHO.reduce((a, b) => a + Number(b.preco || 0), 0);
+            const sub = CARRINHO.reduce((a, b) => a + Number(b.precoTotal || b.preco || 0), 0);
             
             // CORREÇÃO: Se modo delivery mas não calculou frete, mostrar 0
             const frete = (modoConsumo === 'delivery' && gpsOk) ? tFRETE : 0;
@@ -1538,22 +1701,53 @@
             }
             
             // Verificar pedido mínimo
-            const total = CARRINHO.reduce((a, b) => a + Number(b.preco || 0), 0);
+            const total = CARRINHO.reduce((a, b) => a + Number(b.precoTotal || b.preco || 0), 0);
             const pedidoMinimo = CONFIG.pedido_minimo || 25;
             if (total < pedidoMinimo) {
                 alert(`Pedido mínimo: R$ ${pedidoMinimo.toFixed(2).replace('.',',')}\nFaltam: R$ ${(pedidoMinimo - total).toFixed(2).replace('.',',')}`);
                 return;
             }
             
-            // Agrupar itens
-            const ag = CARRINHO.reduce((acc, i) => {
-                acc[i.nome] = (acc[i.nome] || 0) + 1;
-                return acc;
-            }, {});
+            // Agrupar itens por quantidade
+            const itensAgrupados = {};
+            CARRINHO.forEach(item => {
+                if (item.tipo === 'promocao') {
+                    // Promoções são únicas
+                    const key = `${item.nome}|promocao`;
+                    itensAgrupados[key] = {
+                        nome: item.nome,
+                        quantidade: 1,
+                        preco: item.preco,
+                        tipo: 'promocao'
+                    };
+                } else {
+                    // Produtos normais
+                    const key = item.id;
+                    if (itensAgrupados[key]) {
+                        itensAgrupados[key].quantidade += (item.quantidade || 1);
+                    } else {
+                        itensAgrupados[key] = {
+                            nome: item.nome,
+                            quantidade: item.quantidade || 1,
+                            preco: item.preco,
+                            tipo: 'produto'
+                        };
+                    }
+                }
+            });
             
             // Preparar pedido
             const totalFinal = parseFloat(totalStr.replace('R$ ', '').replace('.', '').replace(',', '.'));
             const pagamento = document.getElementById('f-pag').value;
+            
+            // Criar arrays separados para nomes e quantidades
+            const itensNomes = [];
+            const itensQuantidades = {};
+            
+            Object.values(itensAgrupados).forEach(item => {
+                itensNomes.push(item.nome);
+                itensQuantidades[item.nome] = item.quantidade;
+            });
             
             const pedido = {
                 cliente_nome: nome,
@@ -1567,8 +1761,9 @@
                 created_at: new Date().getTime(),
                 pagamento: pagamento,
                 troco: document.getElementById('f-troco').value || "Não solicitado",
-                itens: Object.keys(ag),
-                itens_quantidade: ag,
+                itens: itensNomes,
+                itens_quantidade: itensQuantidades, // Agora é um objeto {nome: quantidade}
+                itens_detalhados: Object.values(itensAgrupados), // Salvar detalhes completos
                 taxa_entrega: tFRETE,
                 lat_cli: latCli,
                 lng_cli: lngCli,
@@ -1591,7 +1786,7 @@
                 
                 // Criar mensagem WhatsApp
                 let itensTxt = "";
-                for (const [nomeItem, qtd] of Object.entries(ag)) {
+                for (const [nomeItem, qtd] of Object.entries(itensQuantidades)) {
                     itensTxt += `• ${qtd}x *${nomeItem}*\n`;
                 }
                 
@@ -1799,7 +1994,6 @@
             }
         }
 
-        // CORREÇÃO: Função renderPedidosADM otimizada
         function renderPedidosADM(pedidos) {
             const sec = document.getElementById('sec-pedidos');
             if (!sec) {
@@ -1879,14 +2073,15 @@
             }
             
             pedidos.forEach(p => {
-                // Processar itens do pedido
+                // Processar itens do pedido com quantidade
                 let itensTexto = "";
                 if (p.itens_quantidade && typeof p.itens_quantidade === 'object') {
+                    // Novo formato: objeto {nome: quantidade}
                     itensTexto = Object.entries(p.itens_quantidade)
                         .map(([n, q]) => `${q}x ${n}`)
                         .join(', ');
                 } else if (Array.isArray(p.itens)) {
-                    // Agrupar itens do array
+                    // Formato antigo: array de itens (para compatibilidade)
                     const ag = p.itens.reduce((acc, item) => {
                         acc[item] = (acc[item] || 0) + 1;
                         return acc;
@@ -1993,19 +2188,27 @@
                             <tr>
                                 <th style="text-align:left; padding:5px; border-bottom: 1px solid #ccc; font-size: 11px;">Item</th>
                                 <th style="text-align:right; padding:5px; border-bottom: 1px solid #ccc; font-size: 11px;">Qtd</th>
+                                <th style="text-align:right; padding:5px; border-bottom: 1px solid #ccc; font-size: 11px;">Valor</th>
                             </tr>`;
                 
-                // Processar itens
+                // Processar itens com quantidade
+                let totalItens = 0;
                 if (pedido.itens_quantidade && typeof pedido.itens_quantidade === 'object') {
                     Object.entries(pedido.itens_quantidade).forEach(([nome, qtd]) => {
+                        // Encontrar o preço do item (simplificado)
+                        const precoItem = pedido.itens_detalhados?.find(i => i.nome === nome)?.preco || 0;
+                        const subtotal = precoItem * qtd;
+                        totalItens += subtotal;
+                        
                         html += `
                         <tr>
                             <td style="padding:5px; font-size: 10px;">${nome}</td>
                             <td style="text-align:right; padding:5px; font-size: 10px;">${qtd}</td>
+                            <td style="text-align:right; padding:5px; font-size: 10px;">R$ ${subtotal.toFixed(2).replace('.',',')}</td>
                         </tr>`;
                     });
                 } else if (Array.isArray(pedido.itens)) {
-                    // Agrupar itens do array
+                    // Formato antigo
                     const ag = pedido.itens.reduce((acc, item) => {
                         acc[item] = (acc[item] || 0) + 1;
                         return acc;
@@ -2016,6 +2219,7 @@
                         <tr>
                             <td style="padding:5px; font-size: 10px;">${nome}</td>
                             <td style="text-align:right; padding:5px; font-size: 10px;">${qtd}</td>
+                            <td style="text-align:right; padding:5px; font-size: 10px;"></td>
                         </tr>`;
                     });
                 }
@@ -3036,6 +3240,8 @@
         window.abrirDetalhesProduto = abrirDetalhesProduto;
         window.fecharDetalhesProduto = fecharDetalhesProduto;
         window.removeCartCheckout = removeCartCheckout;
+        window.aumentarQuantidade = aumentarQuantidade;
+        window.diminuirQuantidade = diminuirQuantidade;
 
         // Funções do painel ADM
         window.switchTab = switchTab;
